@@ -21,7 +21,7 @@ ws_headers = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36"
 }
 
-message_format = "> {chat} \n*{sender}*:\n   {message}"
+message_format = "> {chat} \n*{sender}*:\n{message}"
 maximum_dload_file_size = 1024 * 1024 * 20
 
 tg_chat_id = getenv("TG_CHAT_ID")
@@ -208,6 +208,7 @@ async def get_names_by_uids(client: MaxWSClient, uids: list[int]):
 
 
 async def forward_message(client: MaxWSClient, msg: dict):
+    message_thread_id = getenv("MESSAGE_THREAD_ID")
     if str(msg["payload"]["chatId"]) not in str(getenv("ALLOWED_MAX_CHATS")):
         return
     
@@ -258,11 +259,14 @@ async def forward_message(client: MaxWSClient, msg: dict):
 
                 else:
                     attach_inputs.append(None)
-                    await tgbot.bot.send_message(tg_chat_id, f"{new_text}\n> Unsupported message")
+                    await tgbot.bot.send_message(
+                        chat_id=tg_chat_id, 
+                        text=f"{new_text}\n> Unsupported message",
+                        message_thread_id=message_thread_id)
                     return
             
             attach_inputs[0].caption = new_text
-            await tgbot.bot.send_media_group(tg_chat_id, attach_inputs)
+            await tgbot.bot.send_media_group(tg_chat_id, attach_inputs, message_thread_id=message_thread_id)
 
         elif attaches_num == 1:
             attach = attaches[0]
@@ -271,22 +275,22 @@ async def forward_message(client: MaxWSClient, msg: dict):
             if attach_type == "AUDIO":
                 url = attach.get("url")
                 media = await download_media(url)
-                await tgbot.bot.send_audio(tg_chat_id, tgbot.BufferedInputFile(media, str(attach.get("audioId"))), caption=new_text)
+                await tgbot.bot.send_audio(tg_chat_id, tgbot.BufferedInputFile(media, str(attach.get("audioId"))), caption=new_text, message_thread_id=message_thread_id)
 
             elif attach_type == "PHOTO":
                 url = attach.get("baseUrl")
-                await tgbot.bot.send_photo(tg_chat_id, url, caption=new_text)
+                await tgbot.bot.send_photo(tg_chat_id, url, caption=new_text, message_thread_id=message_thread_id)
 
             elif attach_type == "FILE":
                 media = await download_media(await get_file_dload_link(client, chat_id, attach.get("fileId"), message.get("id")))
-                await tgbot.bot.send_document(tg_chat_id, tgbot.BufferedInputFile(media, attach.get("name")), caption=new_text)
+                await tgbot.bot.send_document(tg_chat_id, tgbot.BufferedInputFile(media, attach.get("name")), caption=new_text, message_thread_id=message_thread_id)
 
             elif attach_type == "VIDEO":
                 media = await download_media(await get_video_dload_link(client, chat_id, attach.get("videoId"), message.get("id")))
-                await tgbot.bot.send_video(tg_chat_id, tgbot.BufferedInputFile(media, str(attach.get("videoId"))), caption=new_text)
+                await tgbot.bot.send_video(tg_chat_id, tgbot.BufferedInputFile(media, str(attach.get("videoId"))), caption=new_text, message_thread_id=message_thread_id)
             
             elif attach_type == "SHARE":
-                await tgbot.bot.send_message(tg_chat_id, new_text, disable_web_page_preview=False)
+                await tgbot.bot.send_message(tg_chat_id, new_text, disable_web_page_preview=False, message_thread_id=message_thread_id)
             
             elif attach_type == "CONTROL":
                 if attach.get("event") == "add":
@@ -295,7 +299,8 @@ async def forward_message(client: MaxWSClient, msg: dict):
 
                     await tgbot.bot.send_message(tg_chat_id, new_text + " \n" + texts.added_member.format(
                         sender=fullname,
-                        added=added_users_str
+                        added=added_users_str,
+                        message_thread_id=message_thread_id
                     ))
                 
                 elif attach.get("event") == "remove":
@@ -305,7 +310,7 @@ async def forward_message(client: MaxWSClient, msg: dict):
                     await tgbot.bot.send_message(tg_chat_id, new_text + " \n" + texts.removed_member.format(
                         sender=fullname,
                         removed=removed_users_str
-                    ))
+                    ), message_thread_id=message_thread_id)
 
                 elif attach.get("event") == "joinByLink":
                     joined_users = await get_names_by_uids(client, [attach.get("userId")])
@@ -313,23 +318,24 @@ async def forward_message(client: MaxWSClient, msg: dict):
 
                     await tgbot.bot.send_message(tg_chat_id, new_text + " \n" + texts.joined_by_link_member.format(
                         sender=joined_users_str
-                    ))
+                    ), message_thread_id=message_thread_id)
 
                 elif attach.get("event") == "leave":
                     left_users_str = fullname
 
                     await tgbot.bot.send_message(tg_chat_id, new_text + " \n" + texts.left_chat.format(
                         sender=left_users_str
-                    ))
+                    ), message_thread_id=message_thread_id)
 
             else:
-                await tgbot.bot.send_message(tg_chat_id, f"{new_text}\n> Unsupported message")
+                await tgbot.bot.send_message(tg_chat_id, f"{new_text}\n> Unsupported message", message_thread_id=message_thread_id)
 
     elif text:
         await tgbot.bot.send_message(
             tg_chat_id, 
             new_text,
-            disable_web_page_preview=True
+            disable_web_page_preview=True,
+            message_thread_id=message_thread_id
         )
 
 
